@@ -15,11 +15,9 @@ class Logman
     [Ensure] $Ensure
 
     [DscProperty()]
-    [ValidateNotNullOrEmpty()]
     [string] $XmlTemplatePath
 
     [DscProperty()]
-    [ValidateNotNullOrEmpty()]
     [string] $LogFilePath
 
     [Logman] Get()
