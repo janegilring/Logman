@@ -7,9 +7,8 @@
 [DscResource()]
 class Logman
 {
-
     [DscProperty(Key)]
-    [string]$DataCollectorSetName
+    [string] $DataCollectorSetName
 
     [DscProperty(Mandatory)]
     [Ensure] $Ensure
@@ -17,91 +16,84 @@ class Logman
     [DscProperty(Mandatory)]
     [string] $XmlTemplatePath
 
-    #Replaces Get-TargetResource
     [Logman] Get()
     {
+        $logmanquery = $this.Query()
 
- $logmanquery = (logman.exe query $this.DataCollectorSetName | Select-String -Pattern Name) -replace 'Name:                 ', ''
+        $returnObj = [Logman]::new()
+        $returnObj.DataCollectorSetName = $this.DataCollectorSetName
+        $returnObj.XmlTemplatePath      = $this.XmlTemplatePath
 
-  if ($logmanquery -contains $this.DataCollectorSetName) 
-  {
-    $this.Ensure = $true
-  }
-  else 
-  {
-    $this.Ensure = $false
-  }
+        if ($logmanquery -contains $this.DataCollectorSetName) 
+        {
+            $returnObj.Ensure = [Ensure]::Present
+        }
+        else 
+        {
+            $returnObj.Ensure = [Ensure]::Absent
+        }
 
-
-  $returnValue = @{
-    DataCollectorSetName = $this.DataCollectorSetName
-    Ensure               = $this.Ensure
-    XmlTemplatePath      = $this.XmlTemplatePath
-  }
-
-  return $returnValue
- 
+        return $returnObj
     }
 
-    #Replaces Set-TargetResource
     [void] Set()
     {
- 
-   if( $this.Ensure -eq 'Present' )
-  {
-    if (Test-Path -Path $this.XmlTemplatePath) 
-    {
-      Write-Verbose -Message "Importing logman Data Collector Set $($this.DataCollectorSetName) from Xml template $($this.XmlTemplatePath)"
+        if( $this.Ensure -eq [Ensure]::Present)
+        {
+            if (Test-Path -Path $this.XmlTemplatePath) 
+            {
+                Write-Verbose -Message "Importing logman Data Collector Set $($this.DataCollectorSetName) from Xml template $($this.XmlTemplatePath)"
 
-      $null = logman.exe import -n $this.DataCollectorSetName -xml $this.XmlTemplatePath
-    } else 
-    {
-      Write-Verbose -Message "$($this.XmlTemplatePath) not found or temporary inaccessible, trying again on next consistency check"
-    }
-  }
-  elseif( $this.Ensure -eq 'Absent' ) 
-  {
-    Write-Verbose -Message "Removing logman Data Collector Set $($this.DataCollectorSetName)"
-
-    $null = logman.exe delete $this.DataCollectorSetName
-  }
-
-
+                $null = logman.exe import -n $this.DataCollectorSetName -xml $this.XmlTemplatePath
+            }
+            else 
+            {
+                Write-Verbose -Message "$($this.XmlTemplatePath) not found or temporary inaccessible, trying again on next consistency check"
+            }
+        }
+        elseif ($this.Ensure -eq [Ensure]::Absent) 
+        {
+            Write-Verbose -Message "Removing logman Data Collector Set $($this.DataCollectorSetName)"
+            $null = logman.exe delete $this.DataCollectorSetName
+        }
     }
  
-    #Replaces Test-TargetResource
     [bool] Test()
     {
+        $logmanquery = $this.Query()
 
-      $logmanquery = (logman.exe query $this.DataCollectorSetName | Select-String -Pattern Name) -replace 'Name:                 ', ''
+        if ($logmanquery -contains $this.DataCollectorSetName) 
+        {
+            Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) exists"
 
-  if ($logmanquery -contains $this.DataCollectorSetName) 
-  {
-    Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) exists"
+            if ($this.Ensure -eq [Ensure]::Present) 
+            {
+                return $true
+            }
+            else
+            {
+                return $false
+            }
+        }
+        else 
+        {
+            Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) does not exist"
 
-    if( $this.Ensure -eq 'Present' ) 
-    {
-      return $true
+            if ($this.Ensure -eq [Ensure]::Present) 
+            {
+                return $false
+            }
+            else
+            {
+                return $true
+            }
+        }
     }
-    elseif ( $this.Ensure -eq 'Absent' ) 
-    {
-      return $false
-    }
-  }
-  else 
-  {
-    Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) does not exist"
 
-    if( $this.Ensure -eq 'Present' ) 
+    [string] Query ()
     {
-      return $false
+        $logmanquery = (logman.exe query $this.DataCollectorSetName |
+            Select-String -Pattern Name) -replace 'Name:                 ', ''
+        return $logmanquery
     }
-    elseif ( $this.Ensure -eq 'Absent' ) 
-    {
-      return $true
-    }
-  }
- 
-    }
- 
- }
+}
