@@ -24,7 +24,7 @@ class Logman
         $returnObj.DataCollectorSetName = $this.DataCollectorSetName
         $returnObj.XmlTemplatePath      = $this.XmlTemplatePath
 
-        if ($logmanquery -contains $this.DataCollectorSetName) 
+        if ($logmanquery -eq $this.DataCollectorSetName) 
         {
             $returnObj.Ensure = [Ensure]::Present
         }
@@ -62,7 +62,7 @@ class Logman
     {
         $logmanquery = $this.Query()
 
-        if ($logmanquery -contains $this.DataCollectorSetName) 
+        if ($logmanquery -eq $this.DataCollectorSetName) 
         {
             Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) exists"
 
@@ -93,7 +93,7 @@ class Logman
     [string] Query ()
     {
         $logmanquery = (logman.exe query $this.DataCollectorSetName |
-            Select-String -Pattern Name) -replace 'Name:                 ', ''
+            Select-String -Pattern "^Name:\s*$($this.DataCollectorSetName)$") -replace "^Name:\s*",',' -as [string]
         return $logmanquery
     }
 }
