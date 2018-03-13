@@ -53,7 +53,16 @@ class Logman
                 {
                     Write-Verbose -Message "Importing logman Data Collector Set $($this.DataCollectorSetName) from Xml template $($this.XmlTemplatePath)"
 
-                    $null = logman.exe import -n $this.DataCollectorSetName -xml $this.XmlTemplatePath
+                    $output = logman.exe import -n $this.DataCollectorSetName -xml $this.XmlTemplatePath
+                    if ( $output -match '^Error:' )
+                    {
+                        throw $output
+                    }
+                    $output = logman.exe -start $this.DataCollectorSetName
+                    if ( $output -match '^Error:' )
+                    {
+                        throw $output
+                    }
                 }
                 else 
                 {
@@ -62,16 +71,22 @@ class Logman
             }
 
             $CurrentLogPath = $this.GetLogPath()
-            if ($CurrentLogPath -ne $this.LogFilePath)
+            $ExpectedLogPath = $this.GetExpectedLogPath()
+            if ([string]::IsNullOrEmpty($ExpectedLogPath) -eq $false -and $CurrentLogPath -ne $ExpectedLogPath)
             {
-                Write-Verbose -Message "Updating LogFilePath $CurrentLogPath to $($this.LogFilePath)"
+                Write-Verbose -Message "Updating LogFilePath $CurrentLogPath to $ExpectedLogPath"
                 $this.UpdateLogPath()
             }
         }
         else
         {
             Write-Verbose -Message "Removing logman Data Collector Set $($this.DataCollectorSetName)"
-            $null = logman.exe delete $this.DataCollectorSetName
+            $null = logman.exe -stop $this.DataCollectorSetName
+            $output = logman.exe delete $this.DataCollectorSetName
+            if ( $output -match '^Error:' )
+            {
+                throw $output
+            }
         }
     }
  
@@ -83,8 +98,9 @@ class Logman
         {
             Write-Verbose -Message "Data Collector $($this.DataCollectorSetName) exists"
 
-            
-            if ($this.LogFilePath -and $this.LogFilePath -ne $this.GetLogPath())
+            $CurrentLogPath = $this.GetLogPath()
+            $ExpectedLogPath = $this.GetExpectedLogPath()
+            if ([string]::IsNullOrEmpty($ExpectedLogPath) -eq $false -and $CurrentLogPath -ne $ExpectedLogPath)
             {
                 Write-Verbose -Message "LogFilePath is not configured correctly"
                 return $false
@@ -124,14 +140,36 @@ class Logman
     [string] GetLogPath ()
     {
         $logmanquery = ((logman.exe query $this.DataCollectorSetName |
-            Select-String -Pattern "^Output\sLocation:\s*") -replace "^Output\sLocation:\s*",''  -split '_')[0] -as [string]
+            Select-String -Pattern "^Output\sLocation:\s*") -replace "^Output\sLocation:\s*(.+_)[^_]+",'$1') -as [string]
         return $logmanquery
+    }
+
+    [string] GetExpectedLogPath()
+    {
+        $setting = $this.LogFilePath
+        if ( [string]::IsNullOrEmpty($setting) )
+        {
+            return $setting
+        }
+        if ( -not $setting.EndsWith('_') )
+        {
+            $setting += '_'
+        }
+        return $setting
     }
 
     [void] UpdateLogPath ()
     {
-        logman.exe -stop $this.DataCollectorSetName
-        logman.exe -update $this.DataCollectorSetName -o "$($this.LogFilePath)"
-        Logman.exe -start $this.DataCollectorSetName
+        $null = logman.exe -stop $this.DataCollectorSetName
+        $output = logman.exe -update $this.DataCollectorSetName -o "$($this.GetExpectedLogPath())"
+        if ( $output -match '^Error:' )
+        {
+            throw $output
+        }
+        $output = logman.exe -start $this.DataCollectorSetName
+        if ( $output -match '^Error:' )
+        {
+            throw $output
+        }
     }
 }
